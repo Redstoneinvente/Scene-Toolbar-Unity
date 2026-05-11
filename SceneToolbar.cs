@@ -10,9 +10,8 @@ using UnityEditor.UIElements;
 [System.Serializable]
 public class SceneToolbarData
 {
-    public List<SceneAsset> scenes = new();
+    public List<string> scenePaths = new();
     public int currentIndex = 0;
-
     public float buttonWidth = 90f;
 }
 
@@ -26,7 +25,9 @@ public static class SceneToolbarStorage
             return new SceneToolbarData();
 
         string json = EditorPrefs.GetString(PREF_KEY);
-        return JsonUtility.FromJson<SceneToolbarData>(json) ?? new SceneToolbarData();
+
+        return JsonUtility.FromJson<SceneToolbarData>(json)
+               ?? new SceneToolbarData();
     }
 
     public static void Save(SceneToolbarData data)
@@ -41,10 +42,16 @@ public class SceneToolbarSettingsWindow : EditorWindow
     private SceneToolbarData data;
     private Vector2 scroll;
 
+    [MenuItem("Tools/Scene Toolbar")]
     public static void ShowWindow()
     {
-        var window = GetWindow<SceneToolbarSettingsWindow>("Scene Toolbar");
-        window.minSize = new Vector2(400, 300);
+        var window =
+            GetWindow<SceneToolbarSettingsWindow>(
+                "Scene Toolbar"
+            );
+
+        window.minSize =
+            new Vector2(400, 300);
     }
 
     private void OnEnable()
@@ -55,25 +62,60 @@ public class SceneToolbarSettingsWindow : EditorWindow
     private void OnGUI()
     {
         GUILayout.Space(10);
-        GUILayout.Label("Scene Toolbar Settings", EditorStyles.boldLabel);
+
+        GUILayout.Label(
+            "Scene Toolbar Settings",
+            EditorStyles.boldLabel
+        );
 
         GUILayout.Space(5);
 
-        scroll = EditorGUILayout.BeginScrollView(scroll);
+        scroll =
+            EditorGUILayout.BeginScrollView(scroll);
 
-        for (int i = 0; i < data.scenes.Count; i++)
+        for (int i = 0;
+             i < data.scenePaths.Count;
+             i++)
         {
             EditorGUILayout.BeginHorizontal();
 
-            data.scenes[i] = (SceneAsset)EditorGUILayout.ObjectField(
-                data.scenes[i],
-                typeof(SceneAsset),
-                false
-            );
+            SceneAsset currentScene = null;
 
-            if (GUILayout.Button("X", GUILayout.Width(30)))
+            if (!string.IsNullOrEmpty(
+                data.scenePaths[i]))
             {
-                data.scenes.RemoveAt(i);
+                currentScene =
+                    AssetDatabase
+                    .LoadAssetAtPath<SceneAsset>(
+                        data.scenePaths[i]
+                    );
+            }
+
+            SceneAsset newScene =
+                (SceneAsset)
+                EditorGUILayout.ObjectField(
+                    currentScene,
+                    typeof(SceneAsset),
+                    false
+                );
+
+            if (newScene != currentScene)
+            {
+                data.scenePaths[i] =
+                    newScene != null
+                    ? AssetDatabase.GetAssetPath(
+                        newScene
+                    )
+                    : "";
+
+                Save();
+            }
+
+            if (GUILayout.Button(
+                "X",
+                GUILayout.Width(30)))
+            {
+                data.scenePaths.RemoveAt(i);
                 Save();
                 break;
             }
@@ -85,31 +127,44 @@ public class SceneToolbarSettingsWindow : EditorWindow
 
         GUILayout.Space(10);
 
-        if (GUILayout.Button("Add Scene", GUILayout.Height(30)))
+        if (GUILayout.Button(
+            "Add Scene",
+            GUILayout.Height(30)))
         {
-            data.scenes.Add(null);
-        }
-
-        GUILayout.Space(10);
-
-        GUILayout.Label("Button Size", EditorStyles.boldLabel);
-
-        float newWidth = EditorGUILayout.Slider(
-            "Width",
-            data.buttonWidth,
-            50f,
-            250f
-        );
-
-        if (!Mathf.Approximately(newWidth, data.buttonWidth))
-        {
-            data.buttonWidth = newWidth;
+            data.scenePaths.Add("");
             Save();
         }
 
         GUILayout.Space(10);
 
-        if (GUILayout.Button("Save", GUILayout.Height(35)))
+        GUILayout.Label(
+            "Button Size",
+            EditorStyles.boldLabel
+        );
+
+        float newWidth =
+            EditorGUILayout.Slider(
+                "Width",
+                data.buttonWidth,
+                50f,
+                250f
+            );
+
+        if (!Mathf.Approximately(
+            newWidth,
+            data.buttonWidth))
+        {
+            data.buttonWidth =
+                newWidth;
+
+            Save();
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button(
+            "Save",
+            GUILayout.Height(35)))
         {
             Save();
         }
@@ -122,46 +177,72 @@ public class SceneToolbarSettingsWindow : EditorWindow
     }
 }
 
-[EditorToolbarElement(ID, typeof(SceneView))]
-public class SceneToolbarElement : VisualElement
+[EditorToolbarElement(
+    ID,
+    typeof(SceneView)
+)]
+public class SceneToolbarElement
+    : VisualElement
 {
-    public const string ID = "Custom/SceneToolbar";
+    public const string ID =
+        "Custom/SceneToolbar";
 
-    private static ToolbarButton[] sceneButtons = new ToolbarButton[3];
-    private static ToolbarButton leftButton;
-    private static ToolbarButton rightButton;
-    private static ToolbarButton settingsButton;
+    private static ToolbarButton[]
+        sceneButtons =
+            new ToolbarButton[3];
 
-    private static SceneToolbarElement instance;
+    private static ToolbarButton
+        leftButton;
+
+    private static ToolbarButton
+        rightButton;
+
+    private static ToolbarButton
+        settingsButton;
+
+    private static SceneToolbarElement
+        instance;
 
     public SceneToolbarElement()
     {
         instance = this;
 
-        style.flexDirection = FlexDirection.Row;
+        style.flexDirection =
+            FlexDirection.Row;
 
-        settingsButton = new ToolbarButton(() =>
-        {
-            SceneToolbarSettingsWindow.ShowWindow();
-        })
-        {
-            text = "⚙"
-        };
+        settingsButton =
+            new ToolbarButton(() =>
+            {
+                SceneToolbarSettingsWindow
+                    .ShowWindow();
+            })
+            {
+                text = "⚙"
+            };
 
         Add(settingsButton);
 
-        leftButton = new ToolbarButton(() =>
-        {
-            var data = SceneToolbarStorage.Load();
-            data.currentIndex =
-                Mathf.Max(0, data.currentIndex - 1);
+        leftButton =
+            new ToolbarButton(() =>
+            {
+                var data =
+                    SceneToolbarStorage
+                    .Load();
 
-            SceneToolbarStorage.Save(data);
-            RefreshButtons();
-        })
-        {
-            text = "<"
-        };
+                data.currentIndex =
+                    Mathf.Max(
+                        0,
+                        data.currentIndex - 1
+                    );
+
+                SceneToolbarStorage
+                    .Save(data);
+
+                RefreshButtons();
+            })
+            {
+                text = "<"
+            };
 
         Add(leftButton);
 
@@ -169,54 +250,76 @@ public class SceneToolbarElement : VisualElement
         {
             int index = i;
 
-            sceneButtons[i] = new ToolbarButton(() =>
-            {
-                OpenScene(index);
-            });
+            sceneButtons[i] =
+                new ToolbarButton(() =>
+                {
+                    OpenScene(index);
+                });
 
             Add(sceneButtons[i]);
         }
 
-        rightButton = new ToolbarButton(() =>
-        {
-            var data = SceneToolbarStorage.Load();
+        rightButton =
+            new ToolbarButton(() =>
+            {
+                var data =
+                    SceneToolbarStorage
+                    .Load();
 
-            int maxIndex = Mathf.Max(0, data.scenes.Count - 3);
+                int maxIndex =
+                    Mathf.Max(
+                        0,
+                        data.scenePaths.Count
+                        - 3
+                    );
 
-            data.currentIndex =
-                Mathf.Min(maxIndex, data.currentIndex + 1);
+                data.currentIndex =
+                    Mathf.Min(
+                        maxIndex,
+                        data.currentIndex + 1
+                    );
 
-            SceneToolbarStorage.Save(data);
-            RefreshButtons();
-        })
-        {
-            text = ">"
-        };
+                SceneToolbarStorage
+                    .Save(data);
+
+                RefreshButtons();
+            })
+            {
+                text = ">"
+            };
 
         Add(rightButton);
 
         RefreshButtons();
     }
 
-    private static void OpenScene(int localIndex)
+    private static void OpenScene(
+        int localIndex)
     {
-        var data = SceneToolbarStorage.Load();
+        var data =
+            SceneToolbarStorage.Load();
 
-        int realIndex = data.currentIndex + localIndex;
+        int realIndex =
+            data.currentIndex
+            + localIndex;
 
-        if (realIndex >= data.scenes.Count)
+        if (realIndex >=
+            data.scenePaths.Count)
             return;
 
-        SceneAsset sceneAsset = data.scenes[realIndex];
+        string path =
+            data.scenePaths[realIndex];
 
-        if (sceneAsset == null)
+        if (string.IsNullOrEmpty(path))
             return;
 
-        string path = AssetDatabase.GetAssetPath(sceneAsset);
-
-        if (EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+        if (
+            EditorSceneManager
+            .SaveCurrentModifiedScenesIfUserWantsTo()
+        )
         {
-            EditorSceneManager.OpenScene(path);
+            EditorSceneManager
+                .OpenScene(path);
         }
     }
 
@@ -225,50 +328,89 @@ public class SceneToolbarElement : VisualElement
         if (instance == null)
             return;
 
-        var data = SceneToolbarStorage.Load();
+        var data =
+            SceneToolbarStorage.Load();
 
         for (int i = 0; i < 3; i++)
         {
-            int sceneIndex = data.currentIndex + i;
+            int sceneIndex =
+                data.currentIndex + i;
 
-            if (sceneIndex < data.scenes.Count &&
-                data.scenes[sceneIndex] != null)
+            if (sceneIndex <
+                data.scenePaths.Count
+                &&
+                !string.IsNullOrEmpty(
+                    data.scenePaths[
+                        sceneIndex
+                    ]))
             {
+                SceneAsset scene =
+                    AssetDatabase
+                    .LoadAssetAtPath
+                    <SceneAsset>(
+                        data.scenePaths[
+                            sceneIndex
+                        ]
+                    );
+
+                if (scene == null)
+                {
+                    sceneButtons[i]
+                        .style.display =
+                        DisplayStyle.None;
+
+                    continue;
+                }
+
                 sceneButtons[i].text =
-    data.scenes[sceneIndex].name;
+                    scene.name;
 
-                sceneButtons[i].style.width =
+                sceneButtons[i]
+                    .style.width =
                     data.buttonWidth;
 
-                sceneButtons[i].style.minWidth =
+                sceneButtons[i]
+                    .style.minWidth =
                     data.buttonWidth;
 
-                sceneButtons[i].style.maxWidth =
+                sceneButtons[i]
+                    .style.maxWidth =
                     data.buttonWidth;
 
-                sceneButtons[i].style.display =
+                sceneButtons[i]
+                    .style.display =
                     DisplayStyle.Flex;
             }
             else
             {
-                sceneButtons[i].style.display =
+                sceneButtons[i]
+                    .style.display =
                     DisplayStyle.None;
             }
         }
 
-        leftButton.SetEnabled(data.currentIndex > 0);
+        leftButton.SetEnabled(
+            data.currentIndex > 0
+        );
 
         rightButton.SetEnabled(
-            data.currentIndex + 3 < data.scenes.Count
+            data.currentIndex + 3 <
+            data.scenePaths.Count
         );
     }
 }
 
-[Overlay(typeof(SceneView), "Scene Toolbar")]
-public class SceneToolbarOverlay : ToolbarOverlay
+[Overlay(
+    typeof(SceneView),
+    "Scene Toolbar"
+)]
+public class SceneToolbarOverlay
+    : ToolbarOverlay
 {
     public SceneToolbarOverlay()
-        : base(SceneToolbarElement.ID)
+        : base(
+            SceneToolbarElement.ID
+        )
     {
     }
 }
@@ -277,6 +419,7 @@ public static class SceneToolbar
 {
     public static void RefreshToolbar()
     {
-        SceneToolbarElement.RefreshButtons();
+        SceneToolbarElement
+            .RefreshButtons();
     }
 }
